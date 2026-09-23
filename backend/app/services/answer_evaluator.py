@@ -1,4 +1,7 @@
+import time
+
 from google import genai
+from google.genai import errors
 
 from app.core.config import GEMINI_API_KEY
 
@@ -7,6 +10,7 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def evaluate_answer(question: str, answer: str):
+
     prompt = f"""
 You are an expert technical interviewer.
 
@@ -30,9 +34,17 @@ Suggestion: <how the candidate can improve>
 Be fair and consider correctness, relevance, clarity, and completeness.
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt
+            )
 
-    return response.text
+            return response.text
+
+        except errors.ServerError as e:
+            if attempt == 2:
+                raise e
+
+            time.sleep(3 * (attempt + 1))

@@ -1,12 +1,15 @@
+import time
+
 from google import genai
+from google.genai import errors
 
 from app.core.config import GEMINI_API_KEY
-
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def analyze_skill_gap(job_role: str, feedback: str):
+
     prompt = f"""
 You are an expert career and interview coach.
 
@@ -35,9 +38,17 @@ Learning Resources:
 Focus on skills that are genuinely relevant to the specified job role.
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt
+            )
 
-    return response.text
+            return response.text
+
+        except errors.ServerError as e:
+            if attempt == 2:
+                raise e
+
+            time.sleep(3 * (attempt + 1))
