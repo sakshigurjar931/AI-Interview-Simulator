@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+import re
 
 from app.database.connection import SessionLocal
 from app.models.interview_session import InterviewSession
@@ -8,6 +9,7 @@ from app.models.interview_question import InterviewQuestion
 from app.models.answer import Answer
 from app.models.feedback_report import FeedbackReport
 from app.services.feedback_generator import generate_feedback
+
 
 router = APIRouter(
     prefix="/ai",
@@ -85,12 +87,10 @@ def generate_interview_feedback(
     )
 
     # Extract overall score
-    import re
-
     score_match = re.search(
-    r"(?:Overall Score\s*:?\s*)?(\d+(?:\.\d+)?)\s*/\s*10",
-    feedback,
-    re.IGNORECASE
+        r"(?:\*\*)?\s*Overall Score\s*:?\s*(?:\*\*)?\s*(\d+(?:\.\d+)?)\s*/\s*10",
+        feedback,
+        re.IGNORECASE
     )
 
     overall_score = None
@@ -103,20 +103,34 @@ def generate_interview_feedback(
     weaknesses = ""
     suggestions = ""
 
+    # Handles:
+    # Strengths:
+    # ### Strengths:
+    # **Strengths:**
     strengths_match = re.search(
-        r"Strengths:\s*(.*?)(?=\n\s*Weaknesses:|\Z)",
+        r"(?:#{1,6}\s*)?(?:\*\*)?Strengths(?:\*\*)?\s*:\s*"
+        r"(.*?)(?=\n\s*(?:#{1,6}\s*)?(?:\*\*)?Weaknesses(?:\*\*)?\s*:|\Z)",
         feedback,
         re.IGNORECASE | re.DOTALL
     )
 
+    # Handles:
+    # Weaknesses:
+    # ### Weaknesses:
+    # **Weaknesses:**
     weaknesses_match = re.search(
-        r"Weaknesses:\s*(.*?)(?=\n\s*Suggestions:|\Z)",
+        r"(?:#{1,6}\s*)?(?:\*\*)?Weaknesses(?:\*\*)?\s*:\s*"
+        r"(.*?)(?=\n\s*(?:#{1,6}\s*)?(?:\*\*)?Suggestions(?:\*\*)?\s*:|\Z)",
         feedback,
         re.IGNORECASE | re.DOTALL
     )
 
+    # Handles:
+    # Suggestions:
+    # ### Suggestions:
+    # **Suggestions:**
     suggestions_match = re.search(
-        r"Suggestions:\s*(.*)",
+        r"(?:#{1,6}\s*)?(?:\*\*)?Suggestions(?:\*\*)?\s*:\s*(.*)",
         feedback,
         re.IGNORECASE | re.DOTALL
     )
@@ -129,6 +143,10 @@ def generate_interview_feedback(
 
     if suggestions_match:
         suggestions = suggestions_match.group(1).strip()
+    # Remove leftover Markdown formatting
+    strengths = strengths.strip("*# ").strip()
+    weaknesses = weaknesses.strip("*# ").strip()
+    suggestions = suggestions.strip("*# ").strip()
 
     # Save feedback report
     new_report = FeedbackReport(
