@@ -4,3 +4,4 @@ __pycache__/
 .env
 database/interview.db
 .vscode/
+.vite/
