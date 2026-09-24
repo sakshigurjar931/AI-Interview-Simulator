@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-[#020B24] text-slate-100 font-sans antialiased;
+    background-image:
+      radial-gradient(60rem 60rem at 80% -10%, rgba(37, 99, 235, 0.12), transparent 60%),
+      radial-gradient(50rem 50rem at -10% 20%, rgba(124, 58, 237, 0.10), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    @apply bg-blue-500/30 text-white;
+  }
+}
+
+@layer components {
+  .container-app {
+    @apply mx-auto w-full max-w-[1280px] px-5 sm:px-8 lg:px-12;
+  }
+
+  .card {
+    @apply rounded-2xl border border-blue-500/20 bg-[#061432]/80 backdrop-blur-sm;
+  }
+
+  .card-hover {
+    @apply transition duration-300 hover:border-blue-400/40 hover:shadow-[0_0_28px_-8px_rgba(59,130,246,0.35)];
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-blue-500/25 bg-[#081A3A]/80 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/30;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-400 via-blue-500 to-violet-500 bg-clip-text text-transparent;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_0_24px_-6px_rgba(59,130,246,0.6)] transition hover:from-blue-500 hover:to-violet-500 hover:shadow-[0_0_32px_-4px_rgba(124,58,237,0.55)] focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:opacity-60;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/30 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-blue-400/50 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400/40;
+  }
+}
+
+@layer utilities {
+  .animate-fade-up {
+    animation: fadeUp 0.6s ease-out both;
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulseSlow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulseSlow {
+    0%, 100% {
+      opacity: 0.8;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-blue-500/30 rounded-full;
+  }
+}
