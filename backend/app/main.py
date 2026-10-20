@@ -1,4 +1,6 @@
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.database.base import Base
@@ -32,17 +34,24 @@ from app.api.routes.ai_skill_gap import router as ai_skill_gap_router
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-
 app = FastAPI(
     title="AI Interview Simulator",
     description="Backend API for AI-powered interview simulation",
-    version="1.0.0"
+    version="1.0.0",
 )
 
+# Allow the local Vite frontend to access the backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# --------------------------------------------------
-# Root endpoint
-# --------------------------------------------------
 
 @app.get("/")
 def root():
@@ -51,14 +60,9 @@ def root():
     }
 
 
-# --------------------------------------------------
-# Database test endpoint
-# --------------------------------------------------
-
 @app.get("/db-test")
 def database_test():
     db = SessionLocal()
-
     try:
         result = db.execute(text("SELECT current_database()"))
         database_name = result.scalar()
@@ -67,7 +71,14 @@ def database_test():
             "message": "Database connected successfully",
             "database": database_name,
             "host": "127.0.0.1",
-            "port": 5432
+            "port": 5432,
+        }
+    finally:
+        db.close()
+
+
+# CRUD routers
+app.include_router(users_router)
 app.include_router(job_roles_router)
 app.include_router(interview_sessions_router)
 app.include_router(questions_router)
@@ -75,11 +86,7 @@ app.include_router(answers_router)
 app.include_router(feedback_router)
 app.include_router(skill_gaps_router)
 
-
-# --------------------------------------------------
-# AI Routers
-# --------------------------------------------------
-
+# AI routers
 app.include_router(ai_questions_router)
 app.include_router(ai_evaluation_router)
 app.include_router(ai_feedback_router)
