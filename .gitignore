@@ -5,3 +5,4 @@ __pycache__/
 database/interview.db
 .vscode/
 .vite/
+node_modules/
