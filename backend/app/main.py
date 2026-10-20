@@ -68,17 +68,6 @@ def database_test():
             "database": database_name,
             "host": "127.0.0.1",
             "port": 5432
-        }
-
-    finally:
-        db.close()
-
-
-# --------------------------------------------------
-# CRUD Routers
-# --------------------------------------------------
-
-app.include_router(users_router)
 app.include_router(job_roles_router)
 app.include_router(interview_sessions_router)
 app.include_router(questions_router)
