@@ -1,14 +1,43 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import RoleCard from '../components/RoleCard';
-import { roles } from '../data/roles';
+import { roles as defaultRoles } from '../data/roles';
+import { getJobRoles } from '../services/api';
+import { getAuthUser } from '../utils/storage';
 
 export default function Roles() {
   const navigate = useNavigate();
+  const [dbRoles, setDbRoles] = useState([]);
+
+  useEffect(() => {
+    // Fetch backend job roles to synchronize IDs
+    getJobRoles()
+      .then((data) => setDbRoles(data || []))
+      .catch((err) => console.warn('Could not fetch backend job roles:', err));
+  }, []);
 
   const handleStart = (role) => {
+    const user = getAuthUser();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    // Match backend role by title if available
+    const matched = dbRoles.find(
+      (r) => r.title.toLowerCase() === role.name.toLowerCase()
+    );
+
+    const roleData = {
+      id: role.id,
+      name: role.name,
+      dbId: matched ? matched.id : 1, // Fallback to 1 if backend not synced yet
+    };
+
     localStorage.setItem('ais_selected_role', role.id);
+    localStorage.setItem('ais_selected_role_data', JSON.stringify(roleData));
     navigate('/interview');
   };
 
@@ -26,7 +55,7 @@ export default function Roles() {
         </div>
 
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {roles.map((role) => (
+          {defaultRoles.map((role) => (
             <RoleCard key={role.id} role={role} onStart={() => handleStart(role)} />
           ))}
         </div>

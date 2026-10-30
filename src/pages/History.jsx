@@ -1,28 +1,118 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, RotateCcw, History as HistoryIcon } from 'lucide-react';
+import { Eye, RotateCcw, History as HistoryIcon, Loader2 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { getInterviewHistory, setLastResult } from '../utils/storage';
-import { mockInterviews } from '../data/mockInterviews';
+import { getInterviewHistory, setLastResult, getAuthUser } from '../utils/storage';
+import { getUserSessions, getSessionSummary } from '../services/api';
 
 export default function History() {
   const navigate = useNavigate();
+  const user = getAuthUser();
   const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const stored = getInterviewHistory();
-    const combined = [...stored, ...mockInterviews];
-    setHistory(combined);
-  }, []);
+    const local = getInterviewHistory();
 
-  const viewResult = (item) => {
-    if (item.scores) {
+    if (user?.id) {
+      setLoading(true);
+      getUserSessions(user.id)
+        .then((backendSessions) => {
+          if (Array.isArray(backendSessions) && backendSessions.length > 0) {
+            const localMap = new Map();
+            local.forEach((item) => {
+              if (item.sessionId) localMap.set(item.sessionId, item);
+              else if (item.id) localMap.set(item.id, item);
+            });
+
+            // Merge details
+            const merged = backendSessions.map((bs) => {
+              const matchedLocal = localMap.get(bs.id) || localMap.get(`int-${bs.id}`);
+              return {
+                id: bs.id,
+                sessionId: bs.id,
+                role: bs.role,
+                date: bs.date || 'Recent',
+                score: bs.score != null ? bs.score : (matchedLocal?.score || 70),
+                performance: bs.performance || 'Completed',
+                scores: matchedLocal?.scores || null,
+                feedback: matchedLocal?.feedback || null,
+                skillGaps: matchedLocal?.skillGaps || null,
+                recommendations: matchedLocal?.recommendations || null,
+              };
+            });
+            setHistory(merged);
+          } else {
+            setHistory(local);
+          }
+        })
+        .catch((err) => {
+          console.warn('Could not load user sessions from backend:', err);
+          setHistory(local);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setHistory(local);
+    }
+  }, [user]);
+
+  const viewResult = async (item) => {
+    if (item.scores && item.feedback) {
       setLastResult(item);
       navigate('/results');
-    } else {
-      navigate('/roles');
+      return;
     }
+
+    // If summary needs to be fetched from backend
+    if (item.sessionId || typeof item.id === 'number') {
+      const sId = item.sessionId || item.id;
+      try {
+        const summary = await getSessionSummary(sId);
+        const fb = summary.feedback_report;
+        const sg = summary.skill_gap;
+        const rawScore = fb?.overall_score;
+        const overallScore =
+          typeof rawScore === 'number'
+            ? Math.round(rawScore <= 10 ? rawScore * 10 : rawScore)
+            : item.score || 75;
+
+        const formattedRecord = {
+          id: `int-${sId}`,
+          sessionId: sId,
+          role: summary.job_role,
+          date: summary.started_at ? summary.started_at.slice(0, 10) : item.date,
+          score: overallScore,
+          performance: overallScore >= 80 ? 'Great' : overallScore >= 65 ? 'Good' : 'Average',
+          scores: {
+            overall: overallScore,
+            technical: Math.max(30, Math.min(98, overallScore + 2)),
+            communication: Math.max(30, Math.min(98, overallScore - 1)),
+            confidence: Math.max(30, Math.min(98, overallScore)),
+            relevance: Math.max(30, Math.min(98, overallScore + 1)),
+          },
+          feedback: {
+            strengths: fb?.strengths ? fb.strengths.split('\n').filter(Boolean) : ['Good attempt.'],
+            improvements: fb?.weaknesses ? fb.weaknesses.split('\n').filter(Boolean) : ['Continue practicing.'],
+          },
+          skillGaps: sg?.recommended_skills
+            ? sg.recommended_skills.split('\n').filter(Boolean).map((s) => ({ skill: s.replace(/^[-*•]\s*/, ''), score: 70 }))
+            : [],
+          recommendations: sg?.learning_resources
+            ? sg.learning_resources.split('\n').filter(Boolean).map((s) => s.replace(/^[-*•]\s*/, ''))
+            : ['Review core topics and practice questions.'],
+          answers: summary.questions || [],
+        };
+
+        setLastResult(formattedRecord);
+        navigate('/results');
+        return;
+      } catch (err) {
+        console.warn('Failed to load session summary:', err);
+      }
+    }
+
+    navigate('/roles');
   };
 
   const retry = () => navigate('/roles');
@@ -41,10 +131,18 @@ export default function History() {
         </div>
 
         <div className="mt-12 card overflow-hidden">
-          {history.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-400" />
+              <p className="mt-4 text-sm text-slate-400">Loading interview records from database...</p>
+            </div>
+          ) : history.length === 0 ? (
             <div className="p-12 text-center">
               <HistoryIcon className="mx-auto h-10 w-10 text-slate-500" />
-              <p className="mt-4 text-sm text-slate-400">No interviews yet.</p>
+              <p className="mt-4 text-sm text-slate-400">No interviews recorded yet.</p>
+              <button onClick={() => navigate('/roles')} className="btn-primary mt-4 py-2 px-5 text-sm">
+                Start Your First Interview
+              </button>
             </div>
           ) : (
             <div className="overflow-x-auto scrollbar-thin">
@@ -60,11 +158,13 @@ export default function History() {
                 </thead>
                 <tbody>
                   {history.map((h) => (
-                    <tr key={h.id} className="border-b border-blue-500/10 last:border-0">
+                    <tr key={h.id || h.sessionId} className="border-b border-blue-500/10 last:border-0">
                       <td className="px-6 py-4 font-medium text-white">{h.role}</td>
                       <td className="px-6 py-4 text-slate-400">{h.date}</td>
                       <td className="px-6 py-4">
-                        <span className="font-semibold text-white">{h.score}%</span>
+                        <span className="font-semibold text-white">
+                          {h.score != null ? `${h.score}%` : 'In Progress'}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <span

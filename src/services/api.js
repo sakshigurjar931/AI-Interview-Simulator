@@ -1,45 +1,199 @@
-import { getQuestionsForRole } from '../data/questions';
 import { getRoleById } from '../data/roles';
+import { getQuestionsForRole } from '../data/questions';
 
-const BASE_URL = import.meta.env?.VITE_API_URL || '';
+export const API_BASE_URL =
+  import.meta.env?.VITE_API_BASE_URL ||
+  import.meta.env?.VITE_API_URL ||
+  'http://127.0.0.1:8000';
 
-async function safeFetch(path, options) {
-  if (!BASE_URL) return null;
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.json();
-}
-
-export async function startInterview(roleId) {
-  return safeFetch('/interviews', {
-    method: 'POST',
-    body: JSON.stringify({ role_id: roleId }),
-  }) || {
-    id: `int-${Date.now()}`,
-    role: getRoleById(roleId).name,
-    roleId,
-    questions: getQuestionsForRole(roleId),
-    startedAt: new Date().toISOString(),
+/**
+ * Central API fetch helper with robust error handling
+ */
+export async function apiFetch(endpoint, options = {}) {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
   };
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    const isJson = response.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? await response.json() : await response.text();
+
+    if (!response.ok) {
+      const errorMsg =
+        (typeof data === 'object' && (data.detail || data.message)) ||
+        `HTTP ${response.status}: ${response.statusText}`;
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error(
+        `Unable to reach the backend server at ${API_BASE_URL}. Please ensure FastAPI is running.`
+      );
+    }
+    throw error;
+  }
 }
 
-export async function getQuestions(roleId) {
-  return getQuestionsForRole(roleId);
+// ----------------------------------------------------------------------
+// Authentication APIs
+// ----------------------------------------------------------------------
+
+export async function registerUser({ name, email, password }) {
+  return apiFetch('/users/', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password }),
+  });
 }
 
-export async function submitAnswer(interviewId, question, answer) {
-  return (
-    safeFetch(`/interviews/${interviewId}/answer`, {
-      method: 'POST',
-      body: JSON.stringify({ question, answer }),
-    }) || { ok: true }
-  );
+export async function loginUser({ email, password }) {
+  return apiFetch('/users/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
 }
 
-export function generateScores(answers) {
+// ----------------------------------------------------------------------
+// Job Roles APIs
+// ----------------------------------------------------------------------
+
+export async function getJobRoles() {
+  return apiFetch('/job-roles/');
+}
+
+// ----------------------------------------------------------------------
+// Interview Session APIs
+// ----------------------------------------------------------------------
+
+export async function createInterviewSession({ userId, jobRoleId }) {
+  return apiFetch('/interview-sessions/', {
+    method: 'POST',
+    body: JSON.stringify({
+      user_id: userId,
+      job_role_id: jobRoleId,
+    }),
+  });
+}
+
+export async function getUserSessions(userId) {
+  return apiFetch(`/interview-sessions/user/${userId}`);
+}
+
+export async function getSessionSummary(sessionId) {
+  return apiFetch(`/interview-sessions/${sessionId}/summary`);
+}
+
+// ----------------------------------------------------------------------
+// AI Interview Flow APIs
+// ----------------------------------------------------------------------
+
+export async function generateAiQuestions({ sessionId, jobRole, difficulty = 'Medium', count = 5 }) {
+  return apiFetch('/ai/generate-questions', {
+    method: 'POST',
+    body: JSON.stringify({
+      session_id: sessionId,
+      job_role: jobRole,
+      difficulty,
+      count,
+    }),
+  });
+}
+
+export async function evaluateAnswer({ questionId, answer }) {
+  return apiFetch('/ai/evaluate-answer', {
+    method: 'POST',
+    body: JSON.stringify({
+      question_id: questionId,
+      answer: answer || '',
+    }),
+  });
+}
+
+export async function generateAiFeedback({ sessionId, jobRole }) {
+  return apiFetch('/ai/generate-feedback', {
+    method: 'POST',
+    body: JSON.stringify({
+      session_id: sessionId,
+      job_role: jobRole,
+    }),
+  });
+}
+
+export async function analyzeAiSkillGap({ sessionId, jobRole }) {
+  return apiFetch('/ai/analyze-skill-gap', {
+    method: 'POST',
+    body: JSON.stringify({
+      session_id: sessionId,
+      job_role: jobRole,
+    }),
+  });
+}
+
+// ----------------------------------------------------------------------
+// Recommendation & Fallback Utilities
+// ----------------------------------------------------------------------
+
+export function getRecommendations(skillGaps = []) {
+  const recs = {
+    DSA: 'Practice DSA arrays and two-pointer problems on LeetCode.',
+    OOP: 'Revise OOP concepts: encapsulation, inheritance, polymorphism.',
+    DBMS: 'Practice SQL joins and normalization scenarios.',
+    'Problem Solving': 'Solve timed coding problems to improve speed.',
+    Communication: 'Record yourself answering behavioral questions with the STAR method.',
+    JavaScript: 'Build a small project using modern ES6+ features and async/await.',
+    React: 'Review React hooks, state management, and component lifecycle patterns.',
+    CSS: 'Practice responsive layouts with Flexbox and CSS Grid.',
+    Accessibility: 'Add ARIA labels and keyboard navigation support to your UI.',
+    'API Design': 'Design a RESTful API with validation and clear status codes.',
+    'System Design': 'Study caching, load balancing, and sharding fundamentals.',
+    Security: 'Review OWASP Top 10 vulnerabilities and secure authentication practices.',
+    SQL: 'Practice SQL aggregations, window functions, and subqueries.',
+    Statistics: 'Revise probability distributions and hypothesis testing.',
+    Excel: 'Practice pivot tables, VLOOKUP, and INDEX/MATCH functions.',
+    Visualization: 'Build interactive dashboards using chart libraries.',
+    ML: 'Implement core machine learning algorithms from scratch in Python.',
+    NLP: 'Fine-tune a text classification model using Hugging Face.',
+    'Deep Learning': 'Build neural network architectures using PyTorch or TensorFlow.',
+    MLOps: 'Set up automated model pipelines and artifact versioning.',
+    Python: 'Practice writing clean, PEP8-compliant, typed Python code.',
+    Cloud: 'Deploy containerized services to AWS, GCP, or Azure.',
+    Networking: 'Study TCP/IP protocols, DNS resolution, and TLS handshakes.',
+    Cryptography: 'Explore symmetric and asymmetric encryption implementations.',
+    Linux: 'Master command-line tools, file permissions, and shell scripting.',
+    Forensics: 'Analyze server access logs to detect anomalous access patterns.',
+    Docker: 'Containerize multi-container applications using Docker Compose.',
+    Kubernetes: 'Deploy scalable services with pods, deployments, and ingress.',
+    AWS: 'Configure IAM policies, S3 buckets, and EC2/ECS workloads.',
+    'CI/CD': 'Build automated test and deployment pipelines with GitHub Actions.',
+  };
+
+  const list = Array.isArray(skillGaps) ? skillGaps : [];
+  if (list.length === 0) {
+    return [
+      'Practice core computer science fundamentals and algorithms.',
+      'Structure technical explanations clearly using the STAR framework.',
+      'Build end-to-end projects demonstrating real-world problem-solving.',
+    ];
+  }
+
+  return list.slice(0, 4).map((g) => {
+    const key = typeof g === 'string' ? g : g.skill || '';
+    return recs[key] || `Deepen your knowledge of ${key || 'core concepts'} through hands-on practice.`;
+  });
+}
+
+export function generateScores(answers = []) {
   const count = answers.length || 1;
   const avgLength =
     answers.reduce((acc, a) => acc + (a.answer?.length || 0), 0) / count;
@@ -87,7 +241,7 @@ export function generateFeedback(scores) {
 
 export function generateSkillGaps(roleId, scores) {
   const role = getRoleById(roleId);
-  const skills = role.skills.concat(['Communication', 'Problem Solving']);
+  const skills = (role?.skills || []).concat(['Communication', 'Problem Solving']);
   const seen = new Set();
   return skills
     .filter((s) => {
@@ -96,55 +250,9 @@ export function generateSkillGaps(roleId, scores) {
       return true;
     })
     .map((skill) => {
-      const base = scores.overall + (Math.random() - 0.5) * 30;
+      const base = (scores?.overall || 70) + (Math.random() - 0.5) * 30;
       return { skill, score: clamp(base) };
     });
-}
-
-export function getRecommendations(skillGaps) {
-  const recs = {
-    DSA: 'Practice DSA arrays and two-pointer problems on LeetCode.',
-    OOP: 'Revise OOP concepts: encapsulation, inheritance, polymorphism.',
-    DBMS: 'Practice SQL joins and normalization scenarios.',
-    'Problem Solving': 'Solve timed coding problems to improve speed.',
-    Communication: 'Record yourself answering behavioral questions.',
-    JavaScript: 'Build a small project using ES6+ features.',
-    React: 'Review React hooks and component lifecycle patterns.',
-    CSS: 'Practice responsive layouts with Flexbox and Grid.',
-    Accessibility: 'Add ARIA labels and keyboard support to a project.',
-    'API Design': 'Design a REST API for a small blog service.',
-    'System Design': 'Study caching, load balancing and sharding basics.',
-    Security: 'Review OWASP Top 10 and common web vulnerabilities.',
-    SQL: 'Practice aggregate functions and subqueries.',
-    Statistics: 'Revise probability distributions and hypothesis testing.',
-    Excel: 'Practice pivot tables and lookup functions.',
-    Visualization: 'Build dashboards using charts and color theory.',
-    ML: 'Implement logistic regression from scratch in Python.',
-    NLP: 'Fine-tune a small text classification model.',
-    'Deep Learning': 'Build a CNN for image classification.',
-    MLOps: 'Set up a model registry and experiment tracking.',
-    Python: 'Practice writing clean, typed Python modules.',
-    Cloud: 'Deploy a container to AWS ECS or GCP Cloud Run.',
-    Networking: 'Study the OSI model and TCP handshake.',
-    Cryptography: 'Practice AES and RSA encryption examples.',
-    Linux: 'Learn common shell commands and permissions.',
-    Forensics: 'Analyze a sample log file for suspicious activity.',
-    Docker: 'Containerize a small app with a multi-stage Dockerfile.',
-    Kubernetes: 'Deploy a service to a local minikube cluster.',
-    AWS: 'Practice IAM policies and S3 bucket security.',
-    'CI/CD': 'Build a GitHub Actions pipeline for a sample repo.',
-  };
-
-  const sorted = [...skillGaps].sort((a, b) => a.score - b.score);
-  return sorted.slice(0, 4).map((g) => recs[g.skill] || `Practice ${g.skill} concepts.`);
-}
-
-export async function getInterviewResult(interviewId) {
-  return safeFetch(`/interviews/${interviewId}/results`);
-}
-
-export async function getRecommendationsForUser(userId) {
-  return safeFetch(`/users/${userId}/recommendations`);
 }
 
 function clamp(value) {

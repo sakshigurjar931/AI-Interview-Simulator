@@ -1,35 +1,58 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BrainCircuit, User, Mail, Lock, ArrowRight } from 'lucide-react';
+import { BrainCircuit, User, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { registerUser } from '../services/api';
 import { setAuthUser } from '../utils/storage';
 
 export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const update = (k) => (e) => {
+    setError('');
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+  };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password) {
+    setError('');
+
+    if (!form.name.trim() || !form.email.trim() || !form.password) {
       setError('Please fill in all fields.');
+      return;
+    }
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
     if (form.password !== form.confirm) {
       setError('Passwords do not match.');
       return;
     }
-    const stored = JSON.parse(localStorage.getItem('ais_users') || '[]');
-    if (stored.some((u) => u.email === form.email)) {
-      setError('An account with this email already exists.');
-      return;
+
+    try {
+      setLoading(true);
+      const user = await registerUser({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      setAuthUser({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        targetRole: 'Software Engineer',
+      });
+
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please check your details and try again.');
+    } finally {
+      setLoading(false);
     }
-    const user = { name: form.name, email: form.email, password: form.password, targetRole: 'Software Engineer' };
-    stored.push(user);
-    localStorage.setItem('ais_users', JSON.stringify(stored));
-    setAuthUser({ name: user.name, email: user.email, targetRole: user.targetRole });
-    navigate('/dashboard');
   };
 
   return (
@@ -58,36 +81,79 @@ export default function Register() {
               <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-slate-300">Full Name</label>
               <div className="relative">
                 <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <input id="name" value={form.name} onChange={update('name')} placeholder="Your Name" className="input-field pl-10" />
+                <input
+                  id="name"
+                  value={form.name}
+                  onChange={update('name')}
+                  placeholder="Your Name"
+                  className="input-field pl-10"
+                  disabled={loading}
+                />
               </div>
             </div>
             <div>
               <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-300">Email</label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <input id="email" type="email" value={form.email} onChange={update('email')} placeholder="you@example.com" className="input-field pl-10" autoComplete="email" />
+                <input
+                  id="email"
+                  type="email"
+                  value={form.email}
+                  onChange={update('email')}
+                  placeholder="you@example.com"
+                  className="input-field pl-10"
+                  autoComplete="email"
+                  disabled={loading}
+                />
               </div>
             </div>
             <div>
               <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-300">Password</label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <input id="password" type="password" value={form.password} onChange={update('password')} placeholder="••••••••" className="input-field pl-10" autoComplete="new-password" />
+                <input
+                  id="password"
+                  type="password"
+                  value={form.password}
+                  onChange={update('password')}
+                  placeholder="••••••••"
+                  className="input-field pl-10"
+                  autoComplete="new-password"
+                  disabled={loading}
+                />
               </div>
             </div>
             <div>
               <label htmlFor="confirm" className="mb-1.5 block text-sm font-medium text-slate-300">Confirm Password</label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <input id="confirm" type="password" value={form.confirm} onChange={update('confirm')} placeholder="••••••••" className="input-field pl-10" autoComplete="new-password" />
+                <input
+                  id="confirm"
+                  type="password"
+                  value={form.confirm}
+                  onChange={update('confirm')}
+                  placeholder="••••••••"
+                  className="input-field pl-10"
+                  autoComplete="new-password"
+                  disabled={loading}
+                />
               </div>
             </div>
 
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
-            <button type="submit" className="btn-primary w-full py-3">
-              Create Account
-              <ArrowRight className="h-4 w-4" />
+            <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  Create Account
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
 

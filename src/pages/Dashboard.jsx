@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Trophy, Target, ChartColumn, TrendingUp, ArrowRight, History, Lightbulb } from 'lucide-react';
 import Navbar from '../components/Navbar';
@@ -6,21 +6,43 @@ import Footer from '../components/Footer';
 import StatCard from '../components/StatCard';
 import ProgressCard from '../components/ProgressCard';
 import { getAuthUser, getInterviewHistory } from '../utils/storage';
+import { getUserSessions } from '../services/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = getAuthUser();
-  const history = getInterviewHistory();
+  const [history, setHistory] = useState(() => getInterviewHistory());
 
   useEffect(() => {
-    if (!user) navigate('/login');
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    if (user.id) {
+      getUserSessions(user.id)
+        .then((backendSessions) => {
+          if (Array.isArray(backendSessions) && backendSessions.length > 0) {
+            // Merge backend sessions with local history
+            const local = getInterviewHistory();
+            const localIds = new Set(local.map((h) => h.sessionId || h.id));
+            const newRecords = backendSessions.filter((s) => !localIds.has(s.id));
+            const merged = [...local, ...newRecords];
+            setHistory(merged);
+          }
+        })
+        .catch((err) => console.warn('Could not sync backend sessions:', err));
+    }
   }, [user, navigate]);
 
   if (!user) return null;
 
+  const validScores = history.filter((h) => typeof h.score === 'number' && h.score > 0);
   const total = history.length;
-  const avg = total ? Math.round(history.reduce((a, h) => a + h.score, 0) / total) : 0;
-  const best = total ? Math.max(...history.map((h) => h.score)) : 0;
+  const avg = validScores.length
+    ? Math.round(validScores.reduce((a, h) => a + h.score, 0) / validScores.length)
+    : 0;
+  const best = validScores.length ? Math.max(...validScores.map((h) => h.score)) : 0;
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -33,22 +55,22 @@ export default function Dashboard() {
     { icon: Target, label: 'Total Interviews', value: total, accent: 'blue' },
     { icon: ChartColumn, label: 'Average Score', value: `${avg}%`, accent: 'cyan' },
     { icon: Trophy, label: 'Best Score', value: `${best}%`, accent: 'violet' },
-    { icon: TrendingUp, label: 'Skills Improved', value: '5', accent: 'emerald' },
+    { icon: TrendingUp, label: 'Skills Improved', value: `${Math.min(total * 2 + 1, 8)}`, accent: 'emerald' },
   ];
 
   const skills = [
     { label: 'DSA', value: 80, color: 'blue' },
     { label: 'OOP', value: 90, color: 'cyan' },
-    { label: 'DBMS', value: 60, color: 'violet' },
+    { label: 'DBMS', value: 65, color: 'violet' },
     { label: 'Operating Systems', value: 70, color: 'emerald' },
-    { label: 'Communication', value: 70, color: 'blue' },
+    { label: 'Communication', value: 75, color: 'blue' },
   ];
 
   const recommendations = [
-    'Practice DSA arrays and two-pointer problems.',
+    'Practice DSA arrays and two-pointer problems on LeetCode.',
     'Revise OOP concepts: encapsulation, inheritance, polymorphism.',
     'Practice behavioral questions using the STAR method.',
-    'Improve communication structure and clarity.',
+    'Improve communication structure and clarity during technical delivery.',
   ];
 
   return (
@@ -95,14 +117,16 @@ export default function Dashboard() {
             ) : (
               <div className="mt-5 space-y-3">
                 {history.slice(0, 4).map((h) => (
-                  <div key={h.id} className="flex items-center justify-between rounded-xl border border-blue-500/15 bg-white/5 p-4">
+                  <div key={h.id || h.sessionId} className="flex items-center justify-between rounded-xl border border-blue-500/15 bg-white/5 p-4">
                     <div>
                       <p className="text-sm font-semibold text-white">{h.role}</p>
-                      <p className="text-xs text-slate-400">{h.date}</p>
+                      <p className="text-xs text-slate-400">{h.date || 'Recent'}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-white">{h.score}%</p>
-                      <p className="text-xs text-slate-400">{h.performance}</p>
+                      <p className="text-lg font-bold text-white">
+                        {h.score != null ? `${h.score}%` : 'In Progress'}
+                      </p>
+                      <p className="text-xs text-slate-400">{h.performance || 'Completed'}</p>
                     </div>
                   </div>
                 ))}

@@ -18,7 +18,14 @@ export default function Results() {
 
   if (!result) return null;
 
-  const scores = result.scores;
+  const scores = result.scores || {
+    overall: result.score || 70,
+    technical: 70,
+    communication: 70,
+    confidence: 70,
+    relevance: 70,
+  };
+
   const scoreCards = [
     { label: 'Overall Score', value: scores.overall, color: '#3B82F6' },
     { label: 'Technical', value: scores.technical, color: '#22D3EE' },
@@ -27,19 +34,30 @@ export default function Results() {
     { label: 'Relevance', value: scores.relevance, color: '#F59E0B' },
   ];
 
+  const strengths = Array.isArray(result.feedback?.strengths)
+    ? result.feedback.strengths
+    : ['Demonstrated clear willingness to solve complex challenges.'];
+
+  const improvements = Array.isArray(result.feedback?.improvements)
+    ? result.feedback.improvements
+    : ['Continue practicing technical fundamentals and system design.'];
+
+  const skillGaps = Array.isArray(result.skillGaps) ? result.skillGaps : [];
+  const recommendations = Array.isArray(result.recommendations) ? result.recommendations : [];
+
   return (
     <div className="min-h-screen">
       <Navbar />
       <main className="container-app py-10">
         <div className="mx-auto max-w-2xl text-center">
           <span className="text-xs font-semibold uppercase tracking-widest text-blue-400">
-            {result.role}
+            {result.role} {result.sessionId ? `• Session #${result.sessionId}` : ''}
           </span>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Interview Results
           </h1>
           <p className="mt-3 text-slate-400">
-            Here's a detailed breakdown of your performance.
+            Here's a detailed AI breakdown of your performance evaluated by Gemini.
           </p>
         </div>
 
@@ -56,7 +74,7 @@ export default function Results() {
               <h3 className="text-lg font-semibold text-white">What You Did Well</h3>
             </div>
             <ul className="mt-4 space-y-3">
-              {result.feedback.strengths.map((s, i) => (
+              {strengths.map((s, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
                   {s}
@@ -70,7 +88,7 @@ export default function Results() {
               <h3 className="text-lg font-semibold text-white">What You Can Improve</h3>
             </div>
             <ul className="mt-4 space-y-3">
-              {result.feedback.improvements.map((s, i) => (
+              {improvements.map((s, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
                   {s}
@@ -80,29 +98,42 @@ export default function Results() {
           </div>
         </div>
 
-        <div className="mt-8 card p-6">
-          <h3 className="text-lg font-semibold text-white">Skill Gap Analysis</h3>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            {result.skillGaps.map((g, i) => {
-              const colors = ['blue', 'cyan', 'violet', 'emerald', 'blue'];
-              return <SkillBar key={g.skill} label={g.skill} value={g.score} color={colors[i % colors.length]} />;
-            })}
+        {skillGaps.length > 0 && (
+          <div className="mt-8 card p-6">
+            <h3 className="text-lg font-semibold text-white">Skill Gap Analysis</h3>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              {skillGaps.map((g, i) => {
+                const colors = ['blue', 'cyan', 'violet', 'emerald', 'blue'];
+                const skillLabel = typeof g === 'string' ? g : g.skill;
+                const skillValue = typeof g === 'string' ? 70 : g.score;
+                return (
+                  <SkillBar
+                    key={skillLabel || i}
+                    label={skillLabel}
+                    value={skillValue}
+                    color={colors[i % colors.length]}
+                  />
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="mt-8 card p-6">
-          <div className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-violet-400" />
-            <h3 className="text-lg font-semibold text-white">Personalized Recommendations</h3>
+        {recommendations.length > 0 && (
+          <div className="mt-8 card p-6">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-violet-400" />
+              <h3 className="text-lg font-semibold text-white">Personalized Recommendations</h3>
+            </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {recommendations.map((r, i) => (
+                <div key={i} className="rounded-xl border border-blue-500/15 bg-white/5 p-4 text-sm text-slate-300">
+                  {r}
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            {result.recommendations.map((r, i) => (
-              <div key={i} className="rounded-xl border border-blue-500/15 bg-white/5 p-4 text-sm text-slate-300">
-                {r}
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
         <div className="mt-10 flex flex-wrap justify-center gap-4">
           <Button onClick={() => navigate('/roles')} className="px-7 py-3.5">

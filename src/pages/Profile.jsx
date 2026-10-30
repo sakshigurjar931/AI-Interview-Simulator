@@ -30,18 +30,15 @@ export default function Profile() {
 
   if (!user) return null;
 
+  const validScores = history.filter((h) => typeof h.score === 'number' && h.score > 0);
   const total = history.length;
-  const avg = total ? Math.round(history.reduce((a, h) => a + h.score, 0) / total) : 0;
+  const avg = validScores.length
+    ? Math.round(validScores.reduce((a, h) => a + h.score, 0) / validScores.length)
+    : 0;
 
   const handleSave = () => {
     const updated = { ...user, ...form };
     setAuthUser(updated);
-    const users = JSON.parse(localStorage.getItem('ais_users') || '[]');
-    const idx = users.findIndex((u) => u.email === user.email);
-    if (idx >= 0) {
-      users[idx] = { ...users[idx], ...form };
-      localStorage.setItem('ais_users', JSON.stringify(users));
-    }
     setEditing(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);

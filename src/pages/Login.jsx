@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BrainCircuit, Mail, Lock, ArrowRight } from 'lucide-react';
+import { BrainCircuit, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { loginUser } from '../services/api';
 import { setAuthUser } from '../utils/storage';
 
 export default function Login() {
@@ -8,18 +9,38 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
+    setError('');
+
+    if (!email.trim() || !password) {
       setError('Please enter both email and password.');
       return;
     }
-    const stored = JSON.parse(localStorage.getItem('ais_users') || '[]');
-    const user = stored.find((u) => u.email === email && u.password === password);
-    const profile = user || { name: email.split('@')[0], email, targetRole: 'Software Engineer' };
-    setAuthUser(profile);
-    navigate('/dashboard');
+
+    try {
+      setLoading(true);
+      const res = await loginUser({
+        email: email.trim(),
+        password,
+      });
+
+      const user = res.user;
+      setAuthUser({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        targetRole: 'Software Engineer',
+      });
+
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Invalid email or password.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,10 +75,14 @@ export default function Login() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setError('');
+                    setEmail(e.target.value);
+                  }}
                   placeholder="you@example.com"
                   className="input-field pl-10"
                   autoComplete="email"
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -71,24 +96,37 @@ export default function Login() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setError('');
+                    setPassword(e.target.value);
+                  }}
                   placeholder="••••••••"
                   className="input-field pl-10"
                   autoComplete="current-password"
+                  disabled={loading}
                 />
               </div>
             </div>
 
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
-            <button type="submit" className="btn-primary w-full py-3">
-              Login
-              <ArrowRight className="h-4 w-4" />
+            <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                <>
+                  Login
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
 
           <div className="mt-5 flex items-center justify-between text-sm">
-            <a href="#" className="text-slate-400 hover:text-white">Forgot Password?</a>
+            <span className="text-slate-500">Need an account?</span>
             <Link to="/register" className="font-medium text-blue-400 hover:text-blue-300">
               Create Account
             </Link>
