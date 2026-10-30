@@ -1,12 +1,8 @@
-import time
 
-from google import genai
-from google.genai import errors
+from groq import Groq
+from app.core.config import GROQ_API_KEY
 
-from app.core.config import GEMINI_API_KEY
-
-
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = Groq(api_key=GROQ_API_KEY)
 
 
 def evaluate_answer(question: str, answer: str):
@@ -34,17 +30,11 @@ Suggestion: <how the candidate can improve>
 Be fair and consider correctness, relevance, clarity, and completeness.
 """
 
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt
-            )
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_completion_tokens=1024
+    )
 
-            return response.text
-
-        except errors.ServerError as e:
-            if attempt == 2:
-                raise e
-
-            time.sleep(3 * (attempt + 1))
+    return response.choices[0].message.content
