@@ -17,7 +17,7 @@ from app.models.skill_gap import SkillGap
 
 # CRUD routers
 from app.api.routes.users import router as users_router
-from app.api.routes.job_roles import router as job_roles_router
+from app.api.routes.job_roles import router as job_roles_router, seed_job_roles_if_empty
 from app.api.routes.interview_sessions import router as interview_sessions_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.answers import router as answers_router
@@ -51,6 +51,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 @app.get("/")

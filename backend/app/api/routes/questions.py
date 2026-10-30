@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal
@@ -23,7 +24,7 @@ def get_db():
         db.close()
 
 
-@router.post("/", response_model=InterviewQuestionResponse)
+@router.post("/", response_model=InterviewQuestionResponse, status_code=status.HTTP_201_CREATED)
 def create_question(
     question: InterviewQuestionCreate,
     db: Session = Depends(get_db)
@@ -40,3 +41,11 @@ def create_question(
     db.refresh(new_question)
 
     return new_question
+
+
+@router.get("/session/{session_id}", response_model=List[InterviewQuestionResponse])
+def get_session_questions(session_id: int, db: Session = Depends(get_db)):
+    questions = db.query(InterviewQuestion).filter(
+        InterviewQuestion.session_id == session_id
+    ).order_by(InterviewQuestion.id).all()
+    return questions

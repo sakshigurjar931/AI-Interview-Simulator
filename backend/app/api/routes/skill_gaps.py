@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal
@@ -23,7 +24,7 @@ def get_db():
         db.close()
 
 
-@router.post("/", response_model=SkillGapResponse)
+@router.post("/", response_model=SkillGapResponse, status_code=status.HTTP_201_CREATED)
 def create_skill_gap(
     skill_gap: SkillGapCreate,
     db: Session = Depends(get_db)
@@ -40,3 +41,11 @@ def create_skill_gap(
     db.refresh(new_skill_gap)
 
     return new_skill_gap
+
+
+@router.get("/session/{session_id}", response_model=List[SkillGapResponse])
+def get_session_skill_gaps(session_id: int, db: Session = Depends(get_db)):
+    gaps = db.query(SkillGap).filter(
+        SkillGap.session_id == session_id
+    ).order_by(SkillGap.id.desc()).all()
+    return gaps

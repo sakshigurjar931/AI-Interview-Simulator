@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+import re
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -27,7 +28,16 @@ def get_db():
         db.close()
 
 
-@router.post("/analyze-skill-gap")
+def parse_bullet_points(text: str) -> list[str]:
+    items = []
+    for line in text.splitlines():
+        line = line.strip().lstrip("*-•123456789.) ").strip()
+        if line:
+            items.append(line)
+    return items
+
+
+@router.post("/analyze-skill-gap", status_code=status.HTTP_201_CREATED)
 def analyze_interview_skill_gap(
     request: SkillGapRequest,
     db: Session = Depends(get_db)
@@ -77,14 +87,12 @@ Suggestions:
     )
 
     # Extract sections
-    import re
-
     missing_skills = ""
     recommended_skills = ""
     learning_resources = ""
 
     missing_match = re.search(
-        r"Missing Skills:\s*(.*?)(?=\n\s*Recommended Skills:|\Z)",
+        r"Missing Skills:\s*(.*?)(?=\n\s*(?:Recommended Skills|Learning Resources):|\Z)",
         skill_gap,
         re.IGNORECASE | re.DOTALL
     )
@@ -127,7 +135,10 @@ Suggestions:
         "skill_gap_id": new_skill_gap.id,
         "session_id": request.session_id,
         "missing_skills": missing_skills,
+        "missing_skills_list": parse_bullet_points(missing_skills),
         "recommended_skills": recommended_skills,
+        "recommended_skills_list": parse_bullet_points(recommended_skills),
         "learning_resources": learning_resources,
+        "learning_resources_list": parse_bullet_points(learning_resources),
         "skill_gap": skill_gap
     }
