@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal
@@ -23,7 +24,7 @@ def get_db():
         db.close()
 
 
-@router.post("/", response_model=FeedbackReportResponse)
+@router.post("/", response_model=FeedbackReportResponse, status_code=status.HTTP_201_CREATED)
 def create_feedback_report(
     feedback: FeedbackReportCreate,
     db: Session = Depends(get_db)
@@ -41,3 +42,11 @@ def create_feedback_report(
     db.refresh(new_feedback)
 
     return new_feedback
+
+
+@router.get("/session/{session_id}", response_model=List[FeedbackReportResponse])
+def get_session_feedback(session_id: int, db: Session = Depends(get_db)):
+    reports = db.query(FeedbackReport).filter(
+        FeedbackReport.session_id == session_id
+    ).order_by(FeedbackReport.id.desc()).all()
+    return reports

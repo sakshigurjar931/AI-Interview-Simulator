@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+import re
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -28,7 +29,7 @@ def get_db():
         db.close()
 
 
-@router.post("/generate-questions")
+@router.post("/generate-questions", status_code=status.HTTP_201_CREATED)
 def generate_interview_questions(
     request: QuestionRequest,
     db: Session = Depends(get_db)
@@ -40,18 +41,18 @@ def generate_interview_questions(
         count=request.count
     )
 
-    # Split the numbered AI response into individual questions
-    questions = []
+    # Split numbered AI response into individual questions cleanly
+    raw_blocks = re.split(r'(?:^|\n)\s*\d+[\.\)]\s*', questions_text)
+    questions = [b.strip() for b in raw_blocks if b and b.strip() and not b.lower().startswith("here are")]
 
-    for line in questions_text.splitlines():
-        line = line.strip()
-
-        if line:
-            # Remove numbering such as "1.", "2.", "3." etc.
-            cleaned = line.lstrip("0123456789").lstrip(".").strip()
-
-            if cleaned:
-                questions.append(cleaned)
+    # Fallback to line splitting if re.split did not catch them
+    if not questions:
+        for line in questions_text.splitlines():
+            line = line.strip()
+            if line:
+                cleaned = line.lstrip("0123456789").lstrip(".-*) ").strip()
+                if cleaned and len(cleaned) > 10:
+                    questions.append(cleaned)
 
     if not questions:
         raise HTTPException(

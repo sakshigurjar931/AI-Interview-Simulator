@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.database.base import Base
@@ -15,7 +16,7 @@ from app.models.skill_gap import SkillGap
 
 # CRUD routers
 from app.api.routes.users import router as users_router
-from app.api.routes.job_roles import router as job_roles_router
+from app.api.routes.job_roles import router as job_roles_router, seed_job_roles_if_empty
 from app.api.routes.interview_sessions import router as interview_sessions_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.answers import router as answers_router
@@ -38,6 +39,36 @@ app = FastAPI(
     description="Backend API for AI-powered interview simulation",
     version="1.0.0"
 )
+
+
+# --------------------------------------------------
+# CORS Middleware
+# --------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+def startup_event():
+    # Ensure default job roles are seeded if table is empty
+    db = SessionLocal()
+    try:
+        seed_job_roles_if_empty(db)
+    finally:
+        db.close()
 
 
 # --------------------------------------------------

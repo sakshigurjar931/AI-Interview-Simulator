@@ -4,3 +4,6 @@ __pycache__/
 .env
 database/interview.db
 .vscode/
+.env
+.venv/
+__pycache__/
