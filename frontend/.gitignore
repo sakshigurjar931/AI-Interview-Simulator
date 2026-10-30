@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+database/interview.db
+.vscode/
+.vite/
+node_modules/
+dist/
+.vite/
+.env
